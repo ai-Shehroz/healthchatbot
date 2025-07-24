@@ -54,3 +54,5 @@ if user_prompt:
             st.markdown(ai_reply)
 
     st.session_state.messages.append({"role": "assistant", "content": ai_reply})
+st.markdown("---")
+st.markdown("🔧 App developed by **Shehroz Khan Rind**")
