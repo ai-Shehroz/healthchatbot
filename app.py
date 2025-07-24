@@ -1,48 +1,41 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="AI Medical Assistant", page_icon="🩺", layout="wide")
+st.set_page_config(page_title="🩺 HealthChatbot by Shehroz", layout="centered")
 
-st.markdown("<h1 style='text-align: center;'>🩺 Medical Assistant Chatbot</h1>", unsafe_allow_html=True)
-st.markdown("This AI bot helps ask medical questions in a conversational flow. Enter your symptoms or concerns below.")
+st.title("🩺 HealthChatbot - Ask Your Medical Questions")
+st.write("This AI chatbot answers your general medical queries. For emergencies, consult a real doctor.")
 
-# Conversation history
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": "You are a helpful medical assistant. Ask the user relevant questions to help understand their medical concern, one at a time."},
-        {"role": "assistant", "content": "Hello! 👋 I’m your AI medical assistant. What symptoms or health concerns would you like to discuss today?"}
-    ]
+# Input box
+user_input = st.text_input("You:", placeholder="Type your health-related question here...")
 
-# Display previous messages
-for msg in st.session_state.messages[1:]:  # Skip system prompt
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Securely load API key from Streamlit secrets
+API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
-# User input
-user_input = st.chat_input("Type your response or question...")
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "HTTP-Referer": "https://theartificiallab.com",  # optional
+    "X-Title": "HealthChatbot"
+}
 
-    # Send to OpenRouter API
-    headers = {
-        "Authorization": "Bearer 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",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
+# Function to send message to OpenRouter
+def ask_openrouter(prompt):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    data = {
         "model": "mistralai/mistral-7b-instruct:free",
-        "messages": st.session_state.messages,
+        "messages": [
+            {"role": "system", "content": "You are a helpful medical assistant."},
+            {"role": "user", "content": prompt}
+        ]
     }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        return response.json()['choices'][0]['message']['content']
+    else:
+        return f"Error: {response.status_code}\n{response.text}"
 
-    try:
-        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-        res.raise_for_status()
-        reply = res.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        reply = f"❌ Error: {str(e)}"
-
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-    with st.chat_message("assistant"):
-        st.markdown(reply)
+# Handle user input
+if user_input:
+    with st.spinner("Thinking..."):
+        result = ask_openrouter(user_input)
+        st.success(result)
