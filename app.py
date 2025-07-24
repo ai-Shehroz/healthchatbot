@@ -1,41 +1,56 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="🩺 HealthChatbot by Shehroz", layout="centered")
+# App title and header
+st.set_page_config(page_title="🩺 Health Assistant Chatbot")
+st.title("💬 Health Assistant")
+st.caption("Ask your medical questions below:")
 
-st.title("🩺 HealthChatbot - Ask Your Medical Questions")
-st.write("This AI chatbot answers your general medical queries. For emergencies, consult a real doctor.")
+# Set up session state to store messages
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hello! I'm your AI Health Assistant. How can I help you today?"}
+    ]
 
-# Input box
-user_input = st.text_input("You:", placeholder="Type your health-related question here...")
+# Function to generate AI response
+def generate_response(user_input):
+    headers = {
+        "Authorization": f"Bearer {st.secrets['openrouter_api_key']}",
+        "Content-Type": "application/json"
+    }
 
-# Securely load API key from Streamlit secrets
-API_KEY = st.secrets["OPENROUTER_API_KEY"]
-
-headers = {
-    "Authorization": f"Bearer {API_KEY}",
-    "HTTP-Referer": "https://theartificiallab.com",  # optional
-    "X-Title": "HealthChatbot"
-}
-
-# Function to send message to OpenRouter
-def ask_openrouter(prompt):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    data = {
+    body = {
         "model": "mistralai/mistral-7b-instruct:free",
         "messages": [
-            {"role": "system", "content": "You are a helpful medical assistant."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": "You are a helpful and experienced medical assistant."},
+            *st.session_state.messages,
+            {"role": "user", "content": user_input}
         ]
     }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        return response.json()['choices'][0]['message']['content']
-    else:
-        return f"Error: {response.status_code}\n{response.text}"
 
-# Handle user input
-if user_input:
-    with st.spinner("Thinking..."):
-        result = ask_openrouter(user_input)
-        st.success(result)
+    try:
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=body)
+        response.raise_for_status()
+        assistant_message = response.json()["choices"][0]["message"]["content"]
+        return assistant_message
+    except Exception as e:
+        return "❌ Sorry, something went wrong. Please check your API key or internet connection."
+
+# Display conversation
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# User input and reply
+user_prompt = st.chat_input("Type your question...")
+if user_prompt:
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            ai_reply = generate_response(user_prompt)
+            st.markdown(ai_reply)
+
+    st.session_state.messages.append({"role": "assistant", "content": ai_reply})
